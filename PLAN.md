@@ -1,129 +1,316 @@
-﻿# 教师说课 PPT 智能生成系统 - 全栈开发计划 (Plan)
+# 教师说课 PPT 智能生成系统 - 开发方案
 
-本项目是一套基于 **DeepSeek Agent + pptxgenjs + NestJS + Vue 3** 构建的教师说课 PPT 自动化生成全栈系统。教师仅需输入学科、学段与课文名称，系统即可自动分步生成标准说课教案大纲、设计教学环节与板书，并直接导出排版精美、内置演讲逐字稿备注的原生 `.pptx` 演示文稿。
-
----
-
-## 一、 系统架构与技术选型
-
-| 架构层级 | 技术选型 | 核心职责 |
-| :--- | :--- | :--- |
-| **后端服务 (`server/`)** | **NestJS + TypeScript** | 接收前端请求、调用 DeepSeek API、编排说课大纲、生成 PPTX、提供 SSE 流式接口 |
-| **AI 编排引擎** | **DeepSeek-V3 / R1** | 专业说课六步法 Prompt 编排、强类型 JSON 结构化输出、自动分离正文与逐字稿 |
-| **PPT 渲染引擎** | **`pptxgenjs`** | 纯代码绘制原生 16:9 高清幻灯片、色块排版、注入演讲者逐字稿备注（Speaker Notes） |
-| **前端界面 (`web/`)** | **Vue 3 + Vite + TypeScript** | 极简教师输入表单、SSE 实时流式进度反馈、幻灯片在线卡片预览、一键下载 `.pptx` |
-| **部署方案** | **Mac 本地 / 轻量云** | 本地 Node.js/PM2 常驻运行，结合 Cloudflare Tunnel 实现公网 HTTPS 访问 |
+> 基于 NestJS + LangGraph.js + pptxgenjs + Vue3 构建，核心是一条带自修复循环、
+> 质量门禁分支、可选检索增强的多阶段生成 pipeline。
 
 ---
 
-## 二、 DeepSeek Agent 核心角色定位
+## 一、设计原则
+
+1. **确定的地方用代码，不确定的地方才用 LLM**。大纲结构、渲染规则、字数限制是
+   规则问题，不该每次都让模型重新"决定"；只有内容生成（说课思路、逐字稿措辞）
+   才需要 LLM。
+2. **推理和结构化输出分离**。"想清楚怎么讲"和"存成什么格式"是两件事，分两步
+   做，不指望一次模型调用两件事都干好。
+3. **失败是常态，不是异常**。JSON 解析失败、字数超标、模型跑题每天都会发生，
+   系统要把"修复"设计成主路径，而不是靠 try-catch 兜底。
+4. **用户体感优先于总时长**。全程有实时反馈的 30 秒，比黑屏等待的 15 秒体验更好。
+5. **不追求覆盖率 100%，追求诚实的置信度标注**。内容来源分级公开给用户，而不是
+   假装每一页都权威可靠。
+
+---
+
+## 二、整体架构
 
 ```
-[教师输入: 《桂林山水》]
-          ⬇
-[DeepSeek Agent 大脑]
-  ├─ 1. 教学法设计 (规划三维目标、重难点、5个教学环节)
-  ├─ 2. 幻灯片拆解 (将文字提炼为 12~15 页卡片，分离正文与逐字稿)
-  ├─ 3. 工具调度决策 (调用 pptxgenjs 渲染引擎，注入参数)
-  └─ 4. 自我校验 (检查字数是否超标、环节时间是否符合10分钟说课要求)
-          ⬇
-[生成原生 .pptx 文件]
+Vue3 前端（表单 + SSE 实时流 + 卡片预览）
+        ↓ HTTP + SSE
+NestJS 服务（鉴权、限流、任务编排入口、文件下发）
+        ↓
+LangGraph.js StateGraph（生成核心，内嵌重试/修复/质检/检索循环）
+        ↓
+pptxgenjs 渲染层（纯函数，无 LLM 介入）
 ```
 
-1. **特级教师角色**：严格遵循教育部“说课六步法”标准闭环，生成符合教资/公开课评分标准的三维目标与学情分析。
-2. **幻灯片架构师角色**：画面只保留提炼后的核心卡片要点（每句 <15 字），将详尽说课逐字稿自动写入底部的演讲者备注栏（Speaker Notes）。
-3. **工具调度员角色**：输出强类型 JSON 数据，驱动 `pptxgenjs` 完成原生文件渲染。
-4. **质检反思角色**：自动检查字数与版面，防止文字溢出。
+**技术选型说明**：
+- 不采用 DeepSeek Harness（dsh）：dsh 定位是"开放式、模型自主决策下一步做什么"
+  的编码 agent 壳子，developer preview 阶段 API 还在剧烈变化，跟本项目"每一步
+  做什么由代码决定、模型只负责节点内产出内容"的确定性流程诉求不匹配。
+- 采用 LangGraph.js：本项目有两处天然的循环（Schema 自修复、质量门禁打回），
+  用 StateGraph 的条件边显式建模，比手写一堆 if-else + while 更清晰、更好调试，
+  也是可以在简历/面试中讲清楚、可验证的技术点。
 
 ---
 
-## 三、 四阶段开发实施路线图
+## 三、生成核心：StateGraph 设计
 
-### 阶段一：后端核心服务与 PPT 渲染引擎（`server/`）
-- [ ] **1.1 依赖安装与环境配置**
-  - 安装核心依赖：`pptxgenjs`、`openai`、`dotenv`、`class-validator`、`class-transformer`
-  - 配置 `server/.env`（`DEEPSEEK_API_KEY`、`PORT=3000`、`OUTPUT_DIR=./output`）
-- [ ] **1.2 教师说课专业 Prompt 编排（`PptPromptService`）**
-  - 固化“说课六步法”结构：
-    1. **说教材**：教材地位分析、三维教学目标（知识与技能/过程与方法/情感态度价值观）、教学重难点
-    2. **说学情**：学生认知水平、前置基础、易错点与心理特征
-    3. **说教法学法**：情境探究法、启发诱导法、小组合作法
-    4. **说教学过程**（5大环节分配）：创设情境导入(3min) ➜ 师生互动探究(15min) ➜ 分层巩固(10min) ➜ 归纳小结(5min) ➜ 课后延伸(2min)
-    5. **说板书设计**：提纲式 / 图解式结构板书
-    6. **说教学反思/亮点**：教学设计创新点
-  - 约束模型输出为规范的强类型 JSON 数组
-- [ ] **1.3 原生 PPTX 渲染与逐字稿注入（`PptExportService`）**
-  - 基于 `pptxgenjs` 构建 16:9 高清母版与雅致教育配色体系（深蓝/中国红/科技蓝）
-  - 将每页对应的**说课逐字稿**注入到 PPT 底部的 `Speaker Notes`（演讲者备注栏）
-- [ ] **1.4 SSE 流式生成接口实现（`PptController`）**
-  - 接口路由：`POST /api/ppt/generate-stream`
-  - 实时向客户端推送生成进度事件：`{ step: 'OUTLINE', progress: 30, message: '正在分析教材重难点...' }`
-  - 生成完毕后推送下载 URL：`{ step: 'DONE', progress: 100, downloadUrl: '/api/ppt/download/xxx.pptx' }`
+### State 结构
 
----
-
-### 阶段二：前端界面与流式交互（`web/`）
-- [ ] **2.1 前端基础环境搭建**
-  - 安装依赖：`element-plus`、`@element-plus/icons-vue`、`axios`
-- [ ] **2.2 教师输入主界面开发（`Home.vue`）**
-  - 表单输入项：学科选择（语文/数学/英语/物理等）、学段（小学/初中/高中）、课题名称、教材版本（人教/部编/北师大版）
-  - 支持可选填入补充要求（如“重点突出情境教学”、“教资面试 10 分钟试讲标准”）
-- [ ] **2.3 SSE 实时流式进度展示组件**
-  - 动态展示当前 Agent 正在进行的动作（构思大纲 ➜ 撰写教学环节 ➜ 排版幻灯片 ➜ 渲染导出）
-  - 环形进度条与微动效反馈
-- [ ] **2.4 幻灯片在线卡片式预览与下载**
-  - 将生成的页面数据渲染为精致的卡片预览列表，展示每页标题、核心要点与逐字稿
-  - 提供高亮 **【下载完整 .pptx 文件】** 按钮
-
----
-
-### 阶段三：学科定制与视觉增强
-- [ ] **3.1 多学科主题配色自动切换**
-  - **语文**：典雅中国风（朱红 / 青绿 / 米白）
-  - **数学 / 物理**：严谨科技风（深蓝 / 湖蓝 / 浅灰）
-  - **英语 / 艺术**：活力国际风（明黄 / 暖橙 / 墨绿）
-- [ ] **3.2 板书设计结构化图形生成**
-  - 提供提纲式板书、图示结构式板书的自动卡片化排版
-
----
-
-### 阶段四：全链路联调与 Mac 本地部署
-- [ ] **4.1 端到端全链路联调测试**
-  - 验证语文、数学等多篇真实课文的生成质量与下载后 Office/WPS 打开兼容性
-- [ ] **4.2 Mac 本地常驻服务部署**
-  - 使用 `pm2` 启动并守护后端 NestJS 服务
-  - 配置 Cloudflare Tunnel / cpolar 映射本地端口，生成公网 HTTPS 访问域名直接提供给用户
-
----
-
-## 四、 数据契约定义（Data Contracts）
-
-### 1. 生成请求入参（DTO）
 ```typescript
-export class GeneratePptDto {
-  subject: string;          // 学科，如 "语文"
-  grade: string;            // 学段，如 "小学三年级"
-  lessonTitle: string;      // 课题名称，如 "桂林山水"
-  textbookVersion?: string; // 教材版本，如 "人教部编版"
-  extraRequirement?: string;// 特殊要求，如 "用于教资面试说课"
+interface GenState {
+  input: GeneratePptDto;
+  needsResearch: boolean;
+  researchResults?: {
+    query: string;
+    summary: string;
+    sources: { title: string; url: string }[];
+  }[];
+  designThoughts?: string;        // 自然语言说课设计思路（流式）
+  slides: SlideItem[];
+  validationErrors?: string[];
+  qualityIssues?: { pageIndex: number; reason: string }[];
+  repairCount: number;
+  status: 'analyzing' | 'researching' | 'thinking' | 'structuring'
+        | 'validating' | 'checking' | 'rendering' | 'done' | 'failed';
 }
 ```
 
-### 2. 单页幻灯片数据模型（SlideItem）
+### 图结构
+
+```
+input_analysis（规则/轻量LLM：是否需要检索、生成检索query）
+   │
+   ├─需要 → research（多query搜索 + 摘要 + 来源分级，硬超时5s，失败降级跳过）
+   │           ↓
+   └─不需要 ──┤
+              ↓
+design_thinking（R1/V3，自然语言，SSE 流式推送）
+   ↓
+structure（V3 + JSON mode，转 SlideItem[] 结构化数据）
+   ↓
+validate（Zod schema）
+   │
+   ├─失败且 repairCount<3 → repair（错误信息拼入prompt，回 structure）
+   │
+   └─通过 ↓
+quality_gate（纯规则：字数/时长/必需字段，不用 LLM-as-judge，保证毫秒级）
+   │
+   ├─局部页面不过且 repairCount<3 → targeted_fix（只重生成对应页，回 structure）
+   │
+   └─通过 ↓
+render（pptxgenjs，纯函数，零 LLM）
+   ↓
+done / failed（repairCount 耗尽时返回部分结果 + 明确标注需人工检查的页）
+```
+
+**关键约束**：
+- `repairCount` 是全局熔断，超过上限直接进入降级分支，绝不无限重试烧 token。
+- `quality_gate` 只做规则判断，不接 LLM，避免拖慢实时生成的时延。
+- `targeted_fix` 只重跑不合格的那几页，不整批重来。
+
+---
+
+## 四、模型分工
+
+| 阶段 | 模型 | 输出形式 | 说明 |
+|---|---|---|---|
+| design_thinking | R1（或 V3 高精度） | 自然语言 | 想清楚教学目标/环节安排/重难点，流式推送给前端展示"AI备课过程" |
+| structure | V3 + JSON mode/function calling | 结构化 SlideItem[] | 只做格式转换，不需要同时"思考"，失败率更低 |
+| repair | V3 | 结构化（局部修复） | prompt 携带具体 Zod 报错信息，针对性修复而非整体重来 |
+
+R1 目前不支持严格 JSON 模式，`reasoning_content` 与 `content` 分离返回，不要指望
+它直接产出可校验的结构化数据。
+
+---
+
+## 五、检索增强（可选，按需触发）
+
+### 5.1 触发判断
+
+不做全量检索，`input_analysis` 节点用规则 + 轻量 LLM 判断：
+- 是否为需要精确对齐课标/教材版本的场景（如教资面试）
+- 学科/课题是否涉及时效性内容（如英语课讲时事热点）
+
+不满足以上条件的课题，直接跳过检索，用模型通用知识生成——大多数常见教材篇目
+的教学目标、重难点属于全网广泛存在的通用共识，模型本身覆盖率并不低。
+
+### 5.2 research 节点内部设计
+
+1. 多 query 并发搜索，不用一个大而全的 query。
+2. 来源分级：教育部/课程标准官网、教材出版社 > 权威教育媒体 > 一般论坛/自媒体。
+3. 抓取后必须摘要压缩（2~3句/来源），不整页塞入 prompt。
+4. 输出带引用结构：`{ summary, sources: {title, url}[] }[]`。
+5. 硬超时（建议5秒），超时直接放弃搜索结果，走无检索路径，不阻塞主流程。
+6. **时效性问题重点处理**：query 显式加时间限定词（如"仅2026年内发布"），
+   要求结果标注发布时间，避免检索引擎默认排序导致老旧资料排名靠前、
+   或模型脑补训练数据里的过时内容而非真正基于检索结果作答。
+
+### 5.3 分层降级架构（推荐的最终形态）
+
+```
+1. 查自建知识库（优先覆盖高频教材/篇目，仅需教学目标/重难点/教法等元数据，
+   不需要课文原文）
+        ├─命中 → 使用（sourceConfidence: 'verified'）
+        └─未命中 ↓
+2. 判断是否需要精确对齐
+        ├─需要 → 触发实时搜索兜底（sourceConfidence: 'web_searched'）
+        └─不需要 ↓
+3. 直接用模型通用知识生成（sourceConfidence: 'model_knowledge'）
+```
+
+自建知识库的数据来源可考虑 ChinaTextbook 等开源教材整理项目做离线预处理
+（提取教学目标/重难点等元数据，而非直接分发课文原文，注意版权边界，
+不对外展示课文原文本身）。PDF 解析可复用 MinerU 处理复杂版面、多模态
+视觉路由处理扫描页的既有经验。
+
+### 5.4 成本控制
+
+- Redis 语义缓存：按"学科+课题+教材版本"做语义相似度缓存，命中率预期不低。
+- 前端表单填写间隙可做异步预取。
+
+### 5.5 HuggingFace 生态可用资源
+
+**数据集（补充教学法通用语料，不作为权威教材元数据来源）**
+- `opencsg/chinese-fineweb-edu-v2`：教育类中文预训练语料，适合补充模型对说课
+  规范、教学法的通用理解。
+- Chinese Cosmopedia：合成语料，明确区分"学术型/教学型/启蒙型"等风格分级，
+  教学型对标中学教科书、做过 Flesch 易读度控制（>60），可参考其分级标准设计
+  本项目的质量门禁阈值。
+- 定位：这两类是清洗过的合成/通用语料，版本与课标对齐精度不足，**不能**直接
+  当作"某版本教材某一课的权威重难点"来源，仅用于补充模型的教学法背景知识，
+  权威性要求高的部分仍走自建知识库/实时检索。
+
+**Embedding / Reranker 模型（直接用于检索层）**
+- `BAAI/bge-large-zh-v1.5` 或 `bge-m3`：中文 RAG 场景常用 embedding，bge-m3 支持
+  稠密+稀疏+多向量混合检索，可与 ES（稀疏/关键词）+ Milvus（稠密/向量）双写
+  架构直接配合。
+- `BAAI/bge-reranker-large`：检索结果二次重排，可结合"是否权威源"作为重排特征，
+  比纯手写规则权重更灵活，直接支撑第五节的来源分级逻辑。
+- 均可本地跑（Mac mini M4 + OrbStack，或 sentence-transformers 库调用），不依赖
+  付费 API，与现有本地化基础设施契合。
+
+**Spaces（面试展示用，与正式产品分离部署）**
+- 用 Gradio/Streamlit 搭一个简化版 demo（输入课题 → 查看生成过程 → 下载 PPT），
+  给面试官一个免部署即可体验的链接，与正式 Vue3 前端分开维护。
+
+**使用注意事项**
+- 仅下载数据集/模型做本地推理不需要 API Key，无泄露风险。
+- 若使用 Inference API 或上传代码到 Spaces，密钥必须放 Spaces Secrets，不得硬编码。
+- 商用前检查各数据集 License（部分仅限研究用途）。
+
+---
+
+## 六、质量门禁：配置化而非硬编码
+
+```typescript
+interface QualityRules {
+  maxCharsPerLine: number;              // 默认15，按学科可覆盖（如数学公式类放宽）
+  speakerNotesRange: [number, number];  // 默认[80, 150]
+  requiredSections: string[];           // 说课六步法各环节
+  totalDurationRange: [number, number]; // 秒
+}
+```
+
+按学科、学段做配置覆盖，不用一套数字打天下。
+
+---
+
+## 七、数据契约
+
+### GeneratePptDto（请求入参）
+```typescript
+export class GeneratePptDto {
+  subject: string;
+  grade: string;
+  lessonTitle: string;
+  textbookVersion?: string;
+  extraRequirement?: string;
+}
+```
+
+### SlideItem（单页数据模型）
 ```typescript
 export interface SlideItem {
   pageIndex: number;
-  type: 'cover' | 'catalog' | 'material' | 'student' | 'method' | 'process' | 'board' | 'summary';
-  title: string;          // 幻灯片标题
-  subtitle?: string;      // 副标题
-  points: string[];       // 页面核心要点卡片
-  speakerNotes: string;   // 说课逐字稿（写入PPT备注栏）
+  type: 'cover' | 'catalog' | 'material' | 'student' | 'method'
+      | 'process' | 'board' | 'summary';
+  title: string;
+  subtitle?: string;
+  points: string[];             // 单条 ≤ maxCharsPerLine
+  speakerNotes: string;
+  durationSeconds?: number;
+  references?: { title: string; url: string }[];  // 引用的外部资料
+  sourceConfidence?: 'verified' | 'web_searched' | 'model_knowledge';
+}
+```
+
+### SSE 事件协议
+```typescript
+export type GenEventType = 'thinking' | 'step' | 'slide' | 'eval' | 'done' | 'error';
+
+export interface GenEventPayload {
+  type: GenEventType;
+  step?: 'ANALYZING' | 'RESEARCHING' | 'REASONING' | 'STRUCTURING'
+       | 'VALIDATING' | 'QUALITY_GATE' | 'RENDERING' | 'DONE';
+  progress: number;             // 0~100
+  message: string;
+  reasoningChunk?: string;      // 思考流增量
+  searchResults?: { query: string; sourcesFound: number }[];
+  slideData?: SlideItem;
+  downloadUrl?: string;
 }
 ```
 
 ---
 
-## 五、 成果验收标准
-1. **可用性**：教师输入课题后，能在 **30~60 秒内** 获得包含完整“说课六步法”的 12~16 页 `.pptx` 文件。
-2. **兼容性**：下载的文件可在 Microsoft PowerPoint 2016+、WPS Office、Keynote 中直接打开并自由编辑修改。
-3. **专业度**：生成的逐字稿完全契合真实说课赛制与教资评委评分标准。
+## 八、开发路线图
+
+### 阶段一：生成核心（server/）
+- [ ] 依赖安装：`pptxgenjs`、`@langchain/langgraph`、`openai`（或 DeepSeek SDK）、
+      `zod`、`class-validator`
+- [ ] 用 LangGraph.js 搭建 StateGraph：`input_analysis` → `research`(可选) →
+      `design_thinking` → `structure` → `validate`/`repair` → `quality_gate`/
+      `targeted_fix` → `render`
+- [ ] pptxgenjs 渲染层：16:9 母版、色块排版、多学科视觉主题、Speaker Notes 注入
+      （与生成逻辑完全解耦，只吃 `SlideItem[]`，可独立写单元测试）
+- [ ] NestJS SSE 控制器：`POST /api/ppt/generate-stream`，将 LangGraph 的
+      `streamEvents` 转换为 `GenEventPayload` 推送给前端
+
+### 阶段二：前端交互（web/）
+- [ ] Pinia 状态管理（`stores/pptGenerator.ts`）
+- [ ] 教师输入表单（`views/Home.vue`）：学科/学段/课题/教材版本/补充要求
+- [ ] 生成状态可视化（`components/GenerationTerminal.vue`）：思考流、检索状态、
+      当前阶段
+- [ ] 幻灯片预览（`components/SlidePreview.vue`）：卡片列表 + 逐字稿分栏 +
+      来源置信度标注 + 下载按钮
+
+### 阶段三：学科定制
+- [ ] 多学科配色策略（文科/理科/综合类）
+- [ ] 板书结构化图示（提纲式/图解式/脉络式布局映射为 pptxgenjs 图形）
+
+### 阶段四：检索增强（可选，视时间安排）
+- [ ] 自建知识库离线预处理（高频教材元数据提取）
+- [ ] 接入 `bge-m3`/`bge-large-zh-v1.5` 作为检索层 embedding（本地部署）
+- [ ] 接入 `bge-reranker-large` 做检索结果二次重排（结合来源权威度特征）
+- [ ] 实时搜索兜底 + Redis 语义缓存
+- [ ] 分层降级逻辑接入 `input_analysis`/`research` 节点
+- [ ] （可选）拉取 `opencsg/chinese-fineweb-edu-v2` 等教育语料补充教学法背景知识
+
+### 阶段五：全链路联调与部署
+- [ ] 端到端测试（典型学科课题，验证 Office/WPS/Keynote 兼容性）
+- [ ] 鉴权 + 限流（公网暴露前必须完成，不留到最后）
+- [ ] 降级策略：模型 API 不可用时的纯模板兜底
+- [ ] pm2 部署 + Cloudflare Tunnel
+
+---
+
+## 九、验收标准（留有余地的版本）
+
+1. **可靠性**：借助校验+自修复能力，repairCount 熔断内目标成功率达标；超限时
+   返回部分结果并明确标注需人工检查的页面，而非整体失败。
+2. **时效性分级**：
+   - P50（无需修复）：25~40 秒
+   - P90（含一次自修复或局部重生成）：60~90 秒
+   - 超过 120 秒或熔断：走降级分支
+3. **专业度**：教学大纲符合说课六步法规范；画面简洁（大字+卡片化）；逐字稿
+   精准嵌入备注栏；引用来源诚实标注置信度。
+
+---
+
+## 十、其他工程细节清单
+
+- [ ] 任务日志持久化：每次生成的中间状态（design_thoughts、slides、耗时、
+      repairCount）存档，作为后续 badcase 分析和三层评估框架的原始数据
+- [ ] LLM-as-judge 仅用于离线 badcase 分析，不进实时生成链路
+- [ ] 版权边界：教材相关数据仅用于教学目标/重难点等元数据提取，不直接对外
+      展示课文原文
