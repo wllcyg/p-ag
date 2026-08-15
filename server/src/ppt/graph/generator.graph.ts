@@ -45,14 +45,37 @@ export type SseEmitter = (event: GenEventPayload) => void;
 const MAX_REPAIR_COUNT = 3;
 
 // ============================================================
-// LLM 工厂（复用 OpenAI 兼容接口，指向硅基流动/DeepSeek）
+// LLM 工厂（复用 OpenAI 兼容接口，支持通义千问/百炼/DeepSeek）
 // ============================================================
+function getApiKey(): string {
+  return (
+    process.env.LLM_API_KEY ||
+    process.env.DEEPSEEK_API_KEY ||
+    process.env.DASHSCOPE_API_KEY ||
+    process.env.SILICONFLOW_API_KEY ||
+    ''
+  );
+}
+
+function getBaseUrl(): string {
+  return (
+    process.env.LLM_BASE_URL ||
+    process.env.DEEPSEEK_BASE_URL ||
+    'https://api.deepseek.com'
+  );
+}
+
 function createThinkingModel() {
+  const modelName =
+    process.env.DEEPSEEK_THINKING_MODEL ||
+    process.env.LLM_THINKING_MODEL ||
+    'qwen-plus';
+
   return new ChatOpenAI({
-    modelName: process.env.DEEPSEEK_THINKING_MODEL || 'deepseek-r1',
-    openAIApiKey: process.env.DEEPSEEK_API_KEY || process.env.SILICONFLOW_API_KEY,
+    modelName,
+    openAIApiKey: getApiKey(),
     configuration: {
-      baseURL: process.env.LLM_BASE_URL || 'https://api.siliconflow.cn/v1',
+      baseURL: getBaseUrl(),
     },
     temperature: 0.7,
     streaming: true,
@@ -60,11 +83,16 @@ function createThinkingModel() {
 }
 
 function createStructureModel() {
+  const modelName =
+    process.env.DEEPSEEK_STRUCTURE_MODEL ||
+    process.env.LLM_STRUCTURE_MODEL ||
+    'qwen-plus';
+
   return new ChatOpenAI({
-    modelName: process.env.DEEPSEEK_STRUCTURE_MODEL || 'deepseek-v3',
-    openAIApiKey: process.env.DEEPSEEK_API_KEY || process.env.SILICONFLOW_API_KEY,
+    modelName,
+    openAIApiKey: getApiKey(),
     configuration: {
-      baseURL: process.env.LLM_BASE_URL || 'https://api.siliconflow.cn/v1',
+      baseURL: getBaseUrl(),
     },
     temperature: 0.3,
     streaming: false,
