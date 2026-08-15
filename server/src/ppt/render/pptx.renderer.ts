@@ -60,10 +60,71 @@ export const THEME_PALETTES: Record<string, ThemePalette> = {
 
 const DEFAULT_THEME = 'cat-purple';
 
+// 字体优先使用中易黑体，找不到时由系统回退（pptx 本身不支持 CSS 式多字体
+// 兜底列表，这里给一个"次优选项"，避免在缺少雅黑的环境上完全无字可用）
+const FONT_FACE = 'Microsoft YaHei';
+const FONT_FACE_FALLBACK = 'PingFang SC';
+
+/** 判断当前渲染环境更可能是 mac/linux 服务器还是 windows，用于选择字体。
+ *  没有可靠的运行时判定方式时，默认仍使用 Microsoft YaHei。
+ */
+function resolveFontFace(): string {
+  try {
+    if (typeof process !== 'undefined' && process.platform && process.platform !== 'win32') {
+      return FONT_FACE_FALLBACK;
+    }
+  } catch {
+    // ignore：非 Node 环境
+  }
+  return FONT_FACE;
+}
+
 // ============================================================
-// 自适应卡片网格布局算法
+// 分页策略：每种版式单页可容纳的最大要点数
+// 超出的部分不再截断丢弃，而是在渲染前拆成"续页"
 // ============================================================
-function computeCardLayout(count: number): {
+const MAX_PER_PAGE: Record<string, number> = {
+  catalog: 7,   // 目录：固定 0.75" 行高，超过 7 条会挤出页面
+  board: 8,     // 板书：辐射节点超过 8 个视觉上会互相压盖，拆成第二张辐射图
+  content: 8,   // 正文卡片：4x2 网格上限，超过拆成"续"页
+};
+
+/**
+ * 把单个 SlideItem 按其类型的容量上限拆分成多个 SlideItem。
+ * - cover 永远只有一页，不参与分页
+ * - 第 2 页起标题自动加"（续 N）"后缀，副标题与演讲稿只保留在第一页，
+ *   避免续页出现重复的副标题/逐字稿
+ */
+function paginateSlide(item: SlideItem): SlideItem[] {
+  if (item.type === 'cover') return [item];
+
+  const max = MAX_PER_PAGE[item.type] ?? MAX_PER_PAGE.content;
+  const points = item.points ?? [];
+  if (points.length <= max) return [item];
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < points.length; i += max) {
+    chunks.push(points.slice(i, i + max));
+  }
+
+  return chunks.map((chunk, idx) => ({
+    ...item,
+    title: idx === 0 ? item.title : `${item.title}（续 ${idx + 1}）`,
+    subtitle: idx === 0 ? item.subtitle : undefined,
+    speakerNotes: idx === 0 ? item.speakerNotes : '',
+    points: chunk,
+  }));
+}
+
+/** 对整份幻灯片数组做分页展开，渲染循环只需要消费展开后的结果 */
+function paginateSlides(slides: SlideItem[]): SlideItem[] {
+  return slides.flatMap((item) => paginateSlide(item));
+}
+
+// ============================================================
+// 卡片网格布局算法（单页最多 8 条要点，超出部分已在分页阶段拆走）
+// ============================================================
+interface CardLayout {
   cols: number;
   rows: number;
   cardW: number;
@@ -72,22 +133,26 @@ function computeCardLayout(count: number): {
   startY: number;
   gapX: number;
   gapY: number;
-} {
-  // 内容区：宽 9.3"，高 4.1"（去掉顶部标题栏后）
-  const areaW = 9.3;
-  const areaH = 4.1;
+}
+
+function computeCardLayout(count: number): CardLayout {
+  // 内容区：宽 12.6"，高 5.4"（去掉顶部标题栏后）
+  const areaW = 12.6;
+  const areaH = 5.4;
   const startY = 1.42;
   const startX = 0.35;
   const gapX = 0.16;
   const gapY = 0.16;
 
-  let cols = 1;
-  let rows = 1;
-  if (count <= 2) { cols = 2; rows = 1; }
-  else if (count <= 3) { cols = 3; rows = 1; }
-  else if (count <= 4) { cols = 2; rows = 2; }
+  let cols: number;
+  let rows: number;
+
+  if (count <= 1) { cols = 1; rows = 1; }
+  else if (count === 2) { cols = 2; rows = 1; }
+  else if (count === 3) { cols = 3; rows = 1; }
+  else if (count === 4) { cols = 2; rows = 2; }
   else if (count <= 6) { cols = 3; rows = 2; }
-  else { cols = 4; rows = 2; }
+  else { cols = 4; rows = 2; } // 最多 8 张（超出的在分页阶段已拆成续页）
 
   const cardW = (areaW - (cols - 1) * gapX) / cols;
   const cardH = (areaH - (rows - 1) * gapY) / rows;
@@ -107,15 +172,24 @@ export class PptRenderService {
    * 生成标准 16:9 PPTX，返回 Buffer
    */
   async render(slides: SlideItem[], dto: GeneratePptDto): Promise<Buffer> {
+    if (!slides || slides.length === 0) {
+      throw new Error('PptRenderService.render: slides 不能为空');
+    }
+
     const pptx = new PptxGenJS();
     const theme = this.getTheme(dto.theme);
+    const fontFace = resolveFontFace();
 
     pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"（宽屏16:9）
     pptx.author = '猫猫 Agent 🐾';
-    pptx.title = dto.lessonTitle;
-    pptx.subject = `${dto.subject} ${dto.grade}`;
+    pptx.title = dto.lessonTitle ?? '未命名课件';
+    pptx.subject = `${dto.subject ?? ''} ${dto.grade ?? ''}`.trim();
 
-    for (const item of slides) {
+    // 分页：任何一页要点数超过该版式容量上限时，拆成多张"续"页，
+    // 而不是让下面的渲染逻辑去处理"数量不可控"的溢出情况
+    const paginatedSlides = paginateSlides(slides);
+
+    for (const item of paginatedSlides) {
       const slide = pptx.addSlide();
 
       // 注入演讲者逐字稿
@@ -125,20 +199,20 @@ export class PptRenderService {
 
       switch (item.type) {
         case 'cover':
-          this.renderCover(slide, item, theme, dto);
+          this.renderCover(slide, item, theme, dto, fontFace);
           break;
         case 'catalog':
-          this.renderCatalog(slide, item, theme);
+          this.renderCatalog(slide, item, theme, fontFace);
           break;
         case 'board':
-          this.renderBoard(slide, item, theme);
+          this.renderBoard(slide, item, theme, fontFace);
           break;
         default:
-          this.renderContent(slide, item, theme);
+          this.renderContent(slide, item, theme, fontFace);
       }
     }
 
-    const arrayBuffer = await pptx.write({ outputType: 'arraybuffer' }) as ArrayBuffer;
+    const arrayBuffer = (await pptx.write({ outputType: 'arraybuffer' })) as ArrayBuffer;
     return Buffer.from(arrayBuffer);
   }
 
@@ -150,6 +224,7 @@ export class PptRenderService {
     item: SlideItem,
     theme: ThemePalette,
     dto: GeneratePptDto,
+    fontFace: string,
   ) {
     // 左侧主色竖条
     slide.addShape('rect' as PptxGenJS.ShapeType, {
@@ -164,22 +239,24 @@ export class PptRenderService {
       line: { type: 'none' },
     });
 
-    // 主标题
-    slide.addText(item.title, {
+    // 主标题（标题过长时自动缩字，避免溢出到右边界之外）
+    slide.addText(item.title || dto.lessonTitle || '', {
       x: 1.0, y: 1.8, w: 11.5, h: 1.5,
       fontSize: 44, bold: true,
       color: theme.textDark,
-      fontFace: 'Microsoft YaHei',
+      fontFace,
       align: 'left',
       wrap: true,
+      shrinkText: true,
     });
 
     // 副标题（学科 + 年级）
-    const subTitle = item.subtitle || `${dto.subject}  ·  ${dto.grade}`;
+    const subTitle = item.subtitle || `${dto.subject ?? ''}  ·  ${dto.grade ?? ''}`;
     slide.addText(subTitle, {
       x: 1.0, y: 3.55, w: 11.5, h: 0.6,
       fontSize: 22, color: theme.primary,
-      fontFace: 'Microsoft YaHei', align: 'left',
+      fontFace, align: 'left',
+      shrinkText: true,
     });
 
     // 分割线
@@ -194,7 +271,8 @@ export class PptRenderService {
       slide.addText(meta, {
         x: 1.0, y: 4.6, w: 11.5, h: 0.5,
         fontSize: 14, color: theme.textMuted,
-        fontFace: 'Microsoft YaHei', align: 'left',
+        fontFace, align: 'left',
+        shrinkText: true,
       });
     }
 
@@ -202,26 +280,32 @@ export class PptRenderService {
     slide.addText('🐾 猫猫 Agent 生成', {
       x: 9.0, y: 7.0, w: 4.0, h: 0.35,
       fontSize: 10, color: theme.textMuted,
-      fontFace: 'Microsoft YaHei', align: 'right',
+      fontFace, align: 'right',
     });
   }
 
   // ----------------------------------------------------------
-  // 目录页
+  // 目录页（容量上限已由分页阶段保证，这里只负责固定布局渲染）
   // ----------------------------------------------------------
   private renderCatalog(
     slide: PptxGenJS.Slide,
     item: SlideItem,
     theme: ThemePalette,
+    fontFace: string,
   ) {
-    this.renderPageHeader(slide, item.title, theme);
+    this.renderPageHeader(slide, item.title, theme, fontFace);
+
+    // 分页阶段已保证 points.length <= MAX_PER_PAGE.catalog（7 条），
+    // 这里用固定行高即可，不需要再动态压缩字号
+    const points = item.points ?? [];
+    if (points.length === 0) return;
 
     const startX = 0.6;
     const startY = 1.55;
     const itemH = 0.75;
     const gap = 0.1;
 
-    item.points.forEach((point, i) => {
+    points.forEach((point, i) => {
       const y = startY + i * (itemH + gap);
 
       // 序号圆形气泡
@@ -233,14 +317,15 @@ export class PptRenderService {
       slide.addText(`${i + 1}`, {
         x: startX, y: y + 0.1, w: 0.5, h: 0.5,
         fontSize: 16, bold: true, color: 'FFFFFF',
-        fontFace: 'Microsoft YaHei', align: 'center', valign: 'middle',
+        fontFace, align: 'center', valign: 'middle',
       });
 
       // 条目文字
       slide.addText(point, {
         x: startX + 0.7, y, w: 11.5, h: itemH,
         fontSize: 20, color: theme.textDark,
-        fontFace: 'Microsoft YaHei', align: 'left', valign: 'middle',
+        fontFace, align: 'left', valign: 'middle',
+        wrap: true, shrinkText: true,
       });
     });
   }
@@ -252,21 +337,26 @@ export class PptRenderService {
     slide: PptxGenJS.Slide,
     item: SlideItem,
     theme: ThemePalette,
+    fontFace: string,
   ) {
-    this.renderPageHeader(slide, item.title, theme);
+    this.renderPageHeader(slide, item.title, theme, fontFace);
 
     if (item.subtitle) {
       slide.addText(item.subtitle, {
         x: 0.4, y: 1.15, w: 12.5, h: 0.35,
         fontSize: 14, color: theme.textMuted,
-        fontFace: 'Microsoft YaHei', align: 'left',
+        fontFace, align: 'left',
+        shrinkText: true,
       });
     }
 
-    const { cols, cardW, cardH, startX, startY, gapX, gapY } =
-      computeCardLayout(item.points.length);
+    // 分页阶段已保证 points.length <= MAX_PER_PAGE.content（8 条）
+    const points = item.points ?? [];
+    if (points.length === 0) return;
 
-    item.points.forEach((point, i) => {
+    const { cols, cardW, cardH, startX, startY, gapX, gapY } = computeCardLayout(points.length);
+
+    points.forEach((point, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const x = startX + col * (cardW + gapX);
@@ -287,12 +377,14 @@ export class PptRenderService {
         line: { type: 'none' },
       });
 
-      // 卡片文字
+      // 卡片文字（要点越多，字号越小，避免文字被截断或溢出卡片；
+      // 分页阶段已保证 points.length <= 8）
+      const fontSize = points.length <= 3 ? 20 : points.length <= 6 ? 16 : 14;
       slide.addText(point, {
         x: x + 0.12, y, w: cardW - 0.18, h: cardH,
-        fontSize: item.points.length <= 3 ? 20 : 16,
+        fontSize,
         color: theme.textDark,
-        fontFace: 'Microsoft YaHei',
+        fontFace,
         align: 'left', valign: 'middle',
         wrap: true, shrinkText: true,
       });
@@ -306,8 +398,9 @@ export class PptRenderService {
     slide: PptxGenJS.Slide,
     item: SlideItem,
     theme: ThemePalette,
+    fontFace: string,
   ) {
-    this.renderPageHeader(slide, item.title, theme);
+    this.renderPageHeader(slide, item.title, theme, fontFace);
 
     // 16:9 WIDE 布局中心点
     const cx = 6.67;
@@ -323,14 +416,24 @@ export class PptRenderService {
     slide.addText(item.subtitle || item.title, {
       x: cx - 1.4, y: cy - 0.45, w: 2.8, h: 0.9,
       fontSize: 18, bold: true, color: 'FFFFFF',
-      fontFace: 'Microsoft YaHei', align: 'center', valign: 'middle',
+      fontFace, align: 'center', valign: 'middle',
+      shrinkText: true,
     });
 
-    // 辐射分支
-    const n = item.points.length;
-    const radius = 2.5;
+    // 分页阶段已保证 points.length <= MAX_PER_PAGE.board（8 条）
+    const points = item.points ?? [];
+    const n = points.length;
 
-    item.points.forEach((point, i) => {
+    // 没有分支要点时，仅展示中心主题框，不再继续计算角度（避免除零）
+    if (n === 0) return;
+
+    // 要点越多，半径适当加大、节点适当缩小，避免节点互相重叠
+    const radius = n <= 6 ? 2.5 : 2.9;
+    const nodeW = n <= 6 ? 2.2 : 1.9;
+    const nodeH = n <= 6 ? 0.64 : 0.56;
+    const fontSize = n <= 6 ? 15 : 12;
+
+    points.forEach((point, i) => {
       const angle = ((2 * Math.PI) / n) * i - Math.PI / 2;
       const nx = cx + radius * Math.cos(angle);
       const ny = cy + radius * Math.sin(angle);
@@ -343,15 +446,16 @@ export class PptRenderService {
 
       // 分支节点
       slide.addShape('roundRect' as PptxGenJS.ShapeType, {
-        x: nx - 1.1, y: ny - 0.32, w: 2.2, h: 0.64,
+        x: nx - nodeW / 2, y: ny - nodeH / 2, w: nodeW, h: nodeH,
         fill: { color: theme.cardBg },
         line: { color: theme.borderColor, width: 0.8 },
         rectRadius: 0.06,
       });
       slide.addText(point, {
-        x: nx - 1.1, y: ny - 0.32, w: 2.2, h: 0.64,
-        fontSize: 15, color: theme.textDark,
-        fontFace: 'Microsoft YaHei', align: 'center', valign: 'middle', wrap: true,
+        x: nx - nodeW / 2, y: ny - nodeH / 2, w: nodeW, h: nodeH,
+        fontSize, color: theme.textDark,
+        fontFace, align: 'center', valign: 'middle',
+        wrap: true, shrinkText: true,
       });
     });
   }
@@ -363,6 +467,7 @@ export class PptRenderService {
     slide: PptxGenJS.Slide,
     title: string,
     theme: ThemePalette,
+    fontFace: string,
   ) {
     // 顶部主色标题栏（全宽 13.33"）
     slide.addShape('rect' as PptxGenJS.ShapeType, {
@@ -376,10 +481,11 @@ export class PptRenderService {
       fill: { color: theme.accent },
       line: { type: 'none' },
     });
-    slide.addText(title, {
+    slide.addText(title || '', {
       x: 0.45, y: 0, w: 12.5, h: 1.2,
       fontSize: 28, bold: true, color: 'FFFFFF',
-      fontFace: 'Microsoft YaHei', align: 'left', valign: 'middle',
+      fontFace, align: 'left', valign: 'middle',
+      shrinkText: true,
     });
   }
 }
