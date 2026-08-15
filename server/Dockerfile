@@ -3,18 +3,21 @@
 # ==========================================
 FROM node:20-alpine AS builder
 
+# 安装 pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 WORKDIR /app
 
-# 复制依赖清单，利用缓存层加速构建
-COPY package*.json ./
-RUN npm ci
+# 复制依赖清单，利用 Docker 缓存层加速构建
+COPY package*.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # 复制源码并编译 TypeScript
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 # 清理开发依赖，仅保留生产依赖
-RUN npm prune --production
+RUN pnpm prune --prod
 
 # ==========================================
 # 阶段 2: 运行 (Runner)
@@ -44,7 +47,7 @@ RUN chmod +x ./entrypoint.sh
 # 切换为非 root 用户 (UID 1000) 保证安全
 USER node
 
-# 暴露 HF Spaces 端口
+# 暴露端口
 EXPOSE 7860
 
 # 使用智能启动脚本（检测 Infisical 配置）
