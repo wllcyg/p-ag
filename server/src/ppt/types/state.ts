@@ -72,13 +72,12 @@ export const SlideItemSchema = z.object({
   pageIndex: z.number().int().min(1),
   type: z.enum(['cover', 'catalog', 'material', 'student', 'method',
                  'process', 'board', 'summary']),
-  title: z.string().min(1).max(20),
-  subtitle: z.string().max(30).optional(),
+  title: z.string().min(1).max(40),
+  subtitle: z.string().max(60).optional(),
   points: z
-    .array(z.string().min(1).max(20))
-    .min(1)
-    .max(8),
-  speakerNotes: z.string().min(30).max(300),
+    .array(z.string().min(1).max(30))
+    .max(10),
+  speakerNotes: z.string().min(10).max(400),
   durationSeconds: z.number().int().positive().optional(),
   references: z
     .array(z.object({ title: z.string(), url: z.string().url() }))
