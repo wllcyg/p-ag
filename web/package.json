@@ -9,7 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.40"
+    "@supabase/supabase-js": "^2.112.3",
+    "axios": "^1.19.0",
+    "lucide-vue-next": "^1.0.0",
+    "pinia": "^4.0.3",
+    "vue": "^3.5.40",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
