@@ -3,7 +3,7 @@ import { ref, reactive } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import {
-  GraduationCap,
+  Cat,
   Sparkles,
   Mail,
   Lock,
@@ -39,7 +39,6 @@ async function handleSubmit() {
   errorMessage.value = '';
   successMessage.value = '';
 
-  // 基础表单验证
   if (!formData.email || !formData.password) {
     errorMessage.value = '请填写完整的邮箱与密码';
     return;
@@ -56,25 +55,23 @@ async function handleSubmit() {
   }
 
   if (isLoginMode.value) {
-    // 执行登录
     const res = await authStore.signIn(formData.email, formData.password);
     if (res.success) {
       const redirectPath = (route.query.redirect as string) || '/';
       router.push(redirectPath);
     } else {
-      errorMessage.value = res.message || '登录失败，请检查账号密码';
+      errorMessage.value = res.message || '登录失败，请检查账号或密码';
     }
   } else {
-    // 执行注册
     const res = await authStore.signUp(formData.email, formData.password);
     if (res.success) {
       if (res.needsConfirmation) {
-        successMessage.value = '注册成功！验证邮件已发送至您的邮箱，请前往查收并激活。';
+        successMessage.value = '注册成功！激活邮件已发送至邮箱，请查收后登录。';
       } else {
-        successMessage.value = '注册成功！正在为您自动登录...';
+        successMessage.value = '注册成功！正在为您进入猫猫工作台...';
         setTimeout(() => {
           router.push('/');
-        }, 1000);
+        }, 800);
       }
     } else {
       errorMessage.value = res.message || '注册失败，请稍后重试';
@@ -84,90 +81,87 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="auth-container">
-    <!-- 动态微光背景球 -->
-    <div class="glow-orb orb-1"></div>
-    <div class="glow-orb orb-2"></div>
-    <div class="glow-orb orb-3"></div>
+  <div class="auth-page">
+    <div class="bg-decoration"></div>
 
-    <div class="auth-card">
-      <!-- 品牌 Header -->
-      <div class="brand-header">
-        <div class="brand-logo">
-          <GraduationCap class="logo-icon" />
-          <div class="badge-sparkle">
+    <div class="auth-box">
+      <!-- 品牌头部 -->
+      <div class="brand-section">
+        <div class="logo-wrapper">
+          <Cat class="logo-icon" />
+          <div class="sparkle-bubble">
             <Sparkles class="sparkle-icon" />
           </div>
         </div>
-        <h1 class="brand-title">教师说课 PPT 智能生成系统</h1>
+        <h1 class="brand-title">猫猫 Agent</h1>
         <p class="brand-desc">
-          {{ isLoginMode ? '欢迎回来，开启 AI 智能备课与说课课件生成' : '加入我们，赋能教师高效制作专业说课演示' }}
+          {{ isLoginMode ? '欢迎回来，唤醒您的专属猫猫智能助手 🐾' : '创建猫猫账号，开启全新智能创作体验 🐾' }}
         </p>
       </div>
 
       <!-- Tab 切换 -->
-      <div class="tab-switch">
+      <div class="tab-header">
         <button
           type="button"
-          class="tab-btn"
+          class="tab-item"
           :class="{ active: isLoginMode }"
           @click="isLoginMode = true"
         >
-          账号登录
+          登录
         </button>
         <button
           type="button"
-          class="tab-btn"
+          class="tab-item"
           :class="{ active: !isLoginMode }"
           @click="isLoginMode = false"
         >
-          教师注册
+          注册
         </button>
       </div>
 
-      <!-- 提示消息反馈 -->
-      <div v-if="errorMessage" class="alert-box error">
-        <AlertCircle class="alert-icon" />
+      <!-- 提示信息 -->
+      <div v-if="errorMessage" class="message-banner error">
+        <AlertCircle class="banner-icon" />
         <span>{{ errorMessage }}</span>
       </div>
 
-      <div v-if="successMessage" class="alert-box success">
-        <CheckCircle2 class="alert-icon" />
+      <div v-if="successMessage" class="message-banner success">
+        <CheckCircle2 class="banner-icon" />
         <span>{{ successMessage }}</span>
       </div>
 
       <!-- 表单主体 -->
-      <form class="auth-form" @submit.prevent="handleSubmit">
-        <div class="input-group">
-          <label for="email">教师工作邮箱</label>
-          <div class="input-wrapper">
-            <Mail class="field-icon" />
+      <form class="form-body" @submit.prevent="handleSubmit">
+        <div class="form-item">
+          <label for="email">账号邮箱</label>
+          <div class="input-container">
+            <Mail class="input-icon" />
             <input
               id="email"
               v-model.trim="formData.email"
               type="email"
-              placeholder="name@school.edu.cn"
+              placeholder="请输入您的邮箱"
               required
               autocomplete="email"
             />
           </div>
         </div>
 
-        <div class="input-group">
+        <div class="form-item">
           <label for="password">密码</label>
-          <div class="input-wrapper">
-            <Lock class="field-icon" />
+          <div class="input-container">
+            <Lock class="input-icon" />
             <input
               id="password"
               v-model="formData.password"
               :type="showPassword ? 'text' : 'password'"
-              placeholder="请输入 6 位及以上密码"
+              placeholder="请输入密码（不少于 6 位）"
               required
               autocomplete="current-password"
             />
             <button
               type="button"
-              class="toggle-eye"
+              class="eye-btn"
               @click="showPassword = !showPassword"
               tabindex="-1"
             >
@@ -177,10 +171,10 @@ async function handleSubmit() {
           </div>
         </div>
 
-        <div v-if="!isLoginMode" class="input-group">
+        <div v-if="!isLoginMode" class="form-item">
           <label for="confirmPassword">确认密码</label>
-          <div class="input-wrapper">
-            <Lock class="field-icon" />
+          <div class="input-container">
+            <Lock class="input-icon" />
             <input
               id="confirmPassword"
               v-model="formData.confirmPassword"
@@ -192,351 +186,306 @@ async function handleSubmit() {
           </div>
         </div>
 
-        <!-- 提交按钮 -->
         <button
           type="submit"
-          class="submit-btn"
+          class="submit-button"
           :disabled="authStore.loading"
         >
           <span v-if="!authStore.loading">
-            {{ isLoginMode ? '进入工作台' : '立即注册账号' }}
+            {{ isLoginMode ? '进入猫猫工作台' : '立即注册' }}
           </span>
-          <span v-else class="loading-state">
-            <div class="spinner"></div>
-            正在处理...
+          <span v-else class="loading-label">
+            <div class="loading-spinner"></div>
+            正在连接...
           </span>
-          <ArrowRight v-if="!authStore.loading" class="btn-arrow" />
+          <ArrowRight v-if="!authStore.loading" class="arrow-icon" />
         </button>
       </form>
 
-      <!-- 底部辅助说明 -->
-      <div class="auth-footer">
-        <span>{{ isLoginMode ? '还没有教师账号？' : '已有账号？' }}</span>
-        <a href="javascript:void(0)" class="switch-link" @click="toggleMode">
+      <!-- 底部操作 -->
+      <div class="auth-bottom">
+        <span>{{ isLoginMode ? '还没有账号？' : '已有账号？' }}</span>
+        <button type="button" class="link-button" @click="toggleMode">
           {{ isLoginMode ? '免费注册' : '直接登录' }}
-        </a>
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.auth-container {
-  min-height: 100vh;
+.auth-page {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
-  background-color: #0c0e14;
-  position: relative;
-  overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: #f8fafc;
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: 1rem;
+  box-sizing: border-box;
 }
 
-/* 渐变微光球 */
-.glow-orb {
+.bg-decoration {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40vh;
+  background: linear-gradient(180deg, #eff6ff 0%, rgba(248, 250, 252, 0) 100%);
   pointer-events: none;
-  opacity: 0.45;
-  animation: floatOrb 12s ease-in-out infinite alternate;
 }
 
-.orb-1 {
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(circle, #6366f1, #4338ca);
-  top: -100px;
-  left: -80px;
-}
-
-.orb-2 {
-  width: 380px;
-  height: 380px;
-  background: radial-gradient(circle, #8b5cf6, #3b82f6);
-  bottom: -80px;
-  right: -60px;
-  animation-duration: 16s;
-}
-
-.orb-3 {
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, #06b6d4, #3b82f6);
-  top: 40%;
-  right: 20%;
-  opacity: 0.2;
-}
-
-@keyframes floatOrb {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-  100% {
-    transform: translate(40px, 30px) scale(1.1);
-  }
-}
-
-/* 毛玻璃卡片 */
-.auth-card {
+.auth-box {
   width: 100%;
-  max-width: 440px;
-  background: rgba(19, 23, 34, 0.75);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 2.5rem 2.25rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  max-width: 390px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 1.75rem 1.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 10px 15px -3px rgba(0, 0, 0, 0.03);
+  position: relative;
   z-index: 1;
 }
 
-/* 品牌头部 */
-.brand-header {
+.brand-section {
   text-align: center;
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.25rem;
 }
 
-.brand-logo {
+.logo-wrapper {
   display: inline-flex;
   position: relative;
   align-items: center;
   justify-content: center;
-  width: 58px;
-  height: 58px;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  border-radius: 16px;
-  box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.5);
-  margin-bottom: 1rem;
+  width: 48px;
+  height: 48px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  margin-bottom: 0.5rem;
 }
 
 .logo-icon {
-  width: 30px;
-  height: 30px;
-  color: #ffffff;
+  width: 26px;
+  height: 26px;
+  color: #2563eb;
 }
 
-.badge-sparkle {
+.sparkle-bubble {
   position: absolute;
   top: -4px;
   right: -4px;
-  background: #06b6d4;
+  background: #3b82f6;
   border-radius: 50%;
-  padding: 3px;
-  border: 2px solid #0c0e14;
+  padding: 2px;
+  border: 2px solid #ffffff;
+  display: flex;
 }
 
 .sparkle-icon {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   color: #ffffff;
-  display: block;
 }
 
 .brand-title {
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 700;
-  color: #f8fafc;
-  margin: 0 0 0.5rem 0;
-  letter-spacing: -0.02em;
+  color: #0f172a;
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.01em;
 }
 
 .brand-desc {
-  font-size: 0.875rem;
-  color: #94a3b8;
+  font-size: 0.8125rem;
+  color: #64748b;
   margin: 0;
-  line-height: 1.5;
 }
 
 /* Tab 切换 */
-.tab-switch {
+.tab-header {
   display: flex;
-  background: rgba(15, 23, 42, 0.6);
-  border-radius: 12px;
-  padding: 4px;
-  margin-bottom: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 1.1rem;
 }
 
-.tab-btn {
+.tab-item {
   flex: 1;
-  padding: 0.6rem 0;
-  font-size: 0.875rem;
+  padding: 0.45rem 0;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: #64748b;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
-.tab-btn.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+.tab-item.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* 提示框 */
-.alert-box {
+/* 提示条 */
+.message-banner {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  font-size: 0.85rem;
-  margin-bottom: 1.25rem;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  margin-bottom: 1rem;
+  line-height: 1.35;
 }
 
-.alert-box.error {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  color: #fca5a5;
+.message-banner.error {
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: #dc2626;
 }
 
-.alert-box.success {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: #86efac;
+.message-banner.success {
+  background: #f0fdf4;
+  border: 1px solid #dcfce7;
+  color: #16a34a;
 }
 
-.alert-icon {
-  width: 16px;
-  height: 16px;
+.banner-icon {
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
 }
 
-/* 表单与输入框 */
-.auth-form {
+/* 表单主体 */
+.form-body {
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 0.9rem;
 }
 
-.input-group {
+.form-item {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.35rem;
   text-align: left;
 }
 
-.input-group label {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #cbd5e1;
+.form-item label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
 }
 
-.input-wrapper {
+.input-container {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.field-icon {
+.input-icon {
   position: absolute;
-  left: 1rem;
-  width: 18px;
-  height: 18px;
-  color: #64748b;
+  left: 0.85rem;
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
   pointer-events: none;
 }
 
-.input-wrapper input {
+.input-container input {
   width: 100%;
-  padding: 0.75rem 2.6rem 0.75rem 2.75rem;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  color: #f8fafc;
-  font-size: 0.9rem;
+  padding: 0.65rem 2.4rem 0.65rem 2.45rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  font-size: 0.875rem;
   outline: none;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   box-sizing: border-box;
 }
 
-.input-wrapper input:focus {
-  border-color: #6366f1;
-  background: rgba(15, 23, 42, 0.9);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+.input-container input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
-.input-wrapper input::placeholder {
-  color: #475569;
+.input-container input::placeholder {
+  color: #94a3b8;
 }
 
-.toggle-eye {
+.eye-btn {
   position: absolute;
-  right: 0.75rem;
+  right: 0.65rem;
   background: transparent;
   border: none;
-  color: #64748b;
+  color: #94a3b8;
   cursor: pointer;
   display: flex;
   align-items: center;
   padding: 4px;
 }
 
-.toggle-eye:hover {
-  color: #cbd5e1;
+.eye-btn:hover {
+  color: #475569;
 }
 
 .eye-icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
-/* 提交按钮 */
-.submit-btn {
+/* 按钮 */
+.submit-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   width: 100%;
-  padding: 0.85rem;
-  margin-top: 0.5rem;
-  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  padding: 0.75rem;
+  margin-top: 0.35rem;
+  background: #2563eb;
   color: #ffffff;
   border: none;
-  border-radius: 12px;
-  font-size: 0.95rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.35);
+  transition: background-color 0.15s ease;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.18);
 }
 
-.submit-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
-  box-shadow: 0 12px 20px -3px rgba(79, 70, 229, 0.45);
-  transform: translateY(-1px);
+.submit-button:hover:not(:disabled) {
+  background: #1d4ed8;
 }
 
-.submit-btn:disabled {
-  opacity: 0.7;
+.submit-button:disabled {
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
-.btn-arrow {
-  width: 18px;
-  height: 18px;
-  transition: transform 0.2s ease;
+.arrow-icon {
+  width: 15px;
+  height: 15px;
 }
 
-.submit-btn:hover:not(:disabled) .btn-arrow {
-  transform: translateX(3px);
-}
-
-.loading-state {
+.loading-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
   border-top-color: #ffffff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -548,24 +497,29 @@ async function handleSubmit() {
   }
 }
 
-/* 底部辅助链接 */
-.auth-footer {
-  margin-top: 1.5rem;
+/* 底部操作 */
+.auth-bottom {
+  margin-top: 1.1rem;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
   color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
 }
 
-.switch-link {
-  color: #818cf8;
-  text-decoration: none;
+.link-button {
+  background: transparent;
+  border: none;
+  color: #2563eb;
   font-weight: 600;
-  margin-left: 0.4rem;
-  transition: color 0.2s ease;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  padding: 0;
 }
 
-.switch-link:hover {
-  color: #a5b4fc;
+.link-button:hover {
   text-decoration: underline;
 }
 </style>

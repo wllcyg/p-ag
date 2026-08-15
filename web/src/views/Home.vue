@@ -2,14 +2,14 @@
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import {
-  GraduationCap,
-  Sparkles,
+  Cat,
   LogOut,
   User,
   Layers,
   Wand2,
   FileCheck,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -22,199 +22,193 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="home-layout">
+  <div class="home-page">
     <!-- 顶部导航栏 -->
-    <header class="navbar">
-      <div class="nav-left">
-        <div class="logo-box">
-          <GraduationCap class="logo-icon" />
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="brand-badge">
+          <Cat class="badge-icon" />
         </div>
-        <div class="title-group">
-          <span class="system-title">教师说课 PPT 智能生成系统</span>
-          <span class="version-tag">AI Powered</span>
+        <div class="brand-info">
+          <span class="system-name">猫猫 Agent</span>
+          <span class="system-tag">智能工作台 🐾</span>
         </div>
       </div>
 
-      <div class="nav-right">
-        <div class="user-badge">
+      <div class="nav-user">
+        <div class="user-chip">
           <User class="user-icon" />
-          <span class="user-email">{{ authStore.userEmail }}</span>
+          <span class="user-text">{{ authStore.userEmail }}</span>
         </div>
-        <button class="logout-btn" @click="handleLogout" title="退出登录">
+        <button class="logout-button" @click="handleLogout" title="安全退出">
           <LogOut class="logout-icon" />
-          <span>退出</span>
+          <span>退出登录</span>
         </button>
       </div>
     </header>
 
-    <!-- 主工作区内容 -->
-    <main class="main-content">
-      <div class="welcome-hero">
-        <div class="hero-tag">
-          <Sparkles class="hero-sparkle" />
-          <span>基于 LangGraph.js + R1/V3 + pptxgenjs 构建</span>
+    <!-- 工作台主区域 -->
+    <main class="workbench-main">
+      <!-- 欢迎标语 -->
+      <section class="hero-banner">
+        <div class="pill-badge">
+          <Sparkles class="pill-icon" />
+          <span>猫猫智能 Agent · 大纲与演示课件一键生成</span>
         </div>
-        <h1 class="hero-title">
-          让每一次说课备课，都<span class="text-gradient">专业、从容、高效</span>
-        </h1>
-        <p class="hero-subtitle">
-          严格遵循说课六步法规范，自动生成教学大纲、卡片化幻灯片排版与逐字演讲稿
+        <h1 class="hero-heading">猫猫 Agent 智能创作与课件工作台</h1>
+        <p class="hero-subtext">
+          基于多阶段思考与结构化渲染管线，自动生成严谨逻辑大纲、精美卡片幻灯片与配套逐字演讲稿。
         </p>
-      </div>
+      </section>
 
-      <!-- 核心特性卡片一览 -->
-      <div class="feature-grid">
-        <div class="feature-card">
-          <div class="card-icon-wrapper purple">
-            <Layers class="card-icon" />
+      <!-- 核心能力卡片 -->
+      <section class="card-grid">
+        <div class="service-card">
+          <div class="icon-avatar blue">
+            <Layers class="avatar-icon" />
           </div>
-          <h3>说课六步法闭环</h3>
-          <p>说教材、说学情、说教法、说教学过程、说板书设计、说反思总结全覆盖。</p>
+          <h3>多阶段智能生成</h3>
+          <p>涵盖结构化分析、内容提炼、版面规划、板书设计与总结反思，规范且可靠。</p>
         </div>
 
-        <div class="feature-card">
-          <div class="card-icon-wrapper indigo">
-            <Wand2 class="card-icon" />
+        <div class="service-card">
+          <div class="icon-avatar indigo">
+            <Wand2 class="avatar-icon" />
           </div>
-          <h3>思考与结构化分离</h3>
-          <p>R1 深度构思教学逻辑，V3 精准转译为 PPT 结构化对象，告别模型幻觉。</p>
+          <h3>深度思考与格式解耦</h3>
+          <p>R1 模型深度构思核心逻辑与论据，V3 快速精准转译为 PPT 结构化对象。</p>
         </div>
 
-        <div class="feature-card">
-          <div class="card-icon-wrapper cyan">
-            <FileCheck class="card-icon" />
+        <div class="service-card">
+          <div class="icon-avatar teal">
+            <FileCheck class="avatar-icon" />
           </div>
-          <h3>毫秒级质量门禁</h3>
-          <p>内置排版防溢出字数校验、逐字稿时长检测与自动修复分支，确保交付可用。</p>
+          <h3>毫秒级规则质量门禁</h3>
+          <p>单行字数防溢出检测、逐字稿时长精准对齐与单页自动打回自修复机制，交付即用。</p>
         </div>
-      </div>
+      </section>
 
-      <!-- 快捷状态指示 -->
-      <div class="status-banner">
-        <div class="status-left">
-          <CheckCircle2 class="status-icon" />
-          <div>
-            <strong>认证环境已连通</strong>
-            <p>Supabase 用户认证服务运行正常，当前用户已通过 Bearer Token 鉴权。</p>
-          </div>
+      <!-- 服务状态提示 -->
+      <section class="connection-status">
+        <CheckCircle2 class="status-badge-icon" />
+        <div class="status-text">
+          <h4>猫猫认证状态正常</h4>
+          <p>已成功连接 Supabase 认证服务，当前会话有效，随时可开始生成演示文稿。</p>
         </div>
-      </div>
+      </section>
     </main>
   </div>
 </template>
 
 <style scoped>
-.home-layout {
+.home-page {
   min-height: 100vh;
-  background-color: #0b0f19;
-  color: #f1f5f9;
+  background: #f8fafc;
+  color: #0f172a;
   display: flex;
   flex-direction: column;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* 顶部导航 */
-.navbar {
-  height: 68px;
+.top-nav {
+  height: 64px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 2rem;
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
-.nav-left {
+.nav-brand {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 0.75rem;
 }
 
-.logo-box {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  border-radius: 10px;
+.brand-badge {
+  width: 36px;
+  height: 36px;
+  background: #2563eb;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
 }
 
-.logo-icon {
-  width: 22px;
-  height: 22px;
+.badge-icon {
+  width: 20px;
+  height: 20px;
   color: #ffffff;
 }
 
-.title-group {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.system-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #f8fafc;
-}
-
-.version-tag {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 2px 8px;
-  background: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
-  border-radius: 999px;
-  border: 1px solid rgba(99, 102, 241, 0.3);
-}
-
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-}
-
-.user-badge {
+.brand-info {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0.8rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+}
+
+.system-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.system-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 999px;
+  border: 1px solid #dbeafe;
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  background: #f1f5f9;
+  border-radius: 6px;
   font-size: 0.85rem;
-  color: #cbd5e1;
+  color: #475569;
 }
 
 .user-icon {
   width: 15px;
   height: 15px;
-  color: #818cf8;
+  color: #64748b;
 }
 
-.logout-btn {
+.logout-button {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.9rem;
-  background: transparent;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
-  border-radius: 8px;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  border-radius: 6px;
   font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
-.logout-btn:hover {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.5);
+.logout-button:hover {
+  background: #fef2f2;
+  border-color: #fee2e2;
+  color: #dc2626;
 }
 
 .logout-icon {
@@ -222,161 +216,151 @@ async function handleLogout() {
   height: 14px;
 }
 
-/* 主内容 */
-.main-content {
+/* 主内容容器 */
+.workbench-main {
   flex: 1;
-  max-width: 1120px;
+  max-width: 1100px;
   width: 100%;
   margin: 0 auto;
-  padding: 3.5rem 1.5rem;
+  padding: 3rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 2.5rem;
+  gap: 2rem;
 }
 
-.welcome-hero {
+.hero-banner {
   text-align: center;
-  max-width: 780px;
+  max-width: 720px;
   margin: 0 auto;
 }
 
-.hero-tag {
+.pill-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.35rem 0.9rem;
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.25);
+  padding: 0.3rem 0.85rem;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
   border-radius: 999px;
-  font-size: 0.825rem;
-  color: #a5b4fc;
-  margin-bottom: 1.25rem;
+  font-size: 0.8125rem;
+  color: #2563eb;
+  margin-bottom: 1rem;
 }
 
-.hero-sparkle {
-  width: 14px;
-  height: 14px;
+.pill-icon {
+  width: 13px;
+  height: 13px;
 }
 
-.hero-title {
-  font-size: 2.5rem;
+.hero-heading {
+  font-size: 2.15rem;
   font-weight: 800;
-  line-height: 1.25;
-  letter-spacing: -0.03em;
-  margin: 0 0 1rem 0;
+  color: #0f172a;
+  margin: 0 0 0.85rem 0;
+  letter-spacing: -0.02em;
 }
 
-.text-gradient {
-  background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.hero-subtitle {
-  font-size: 1.1rem;
-  color: #94a3b8;
+.hero-subtext {
+  font-size: 1.05rem;
+  color: #64748b;
   margin: 0;
   line-height: 1.6;
 }
 
-/* 卡片网格 */
-.feature-grid {
+/* 卡片栅格 */
+.card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
-.feature-card {
-  background: rgba(30, 41, 59, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 16px;
-  padding: 1.75rem;
-  transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-.feature-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-.card-icon-wrapper {
-  width: 46px;
-  height: 46px;
+.service-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.service-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.icon-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
-.card-icon-wrapper.purple {
-  background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
+.icon-avatar.blue {
+  background: #eff6ff;
+  color: #2563eb;
 }
 
-.card-icon-wrapper.indigo {
-  background: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
+.icon-avatar.indigo {
+  background: #eef2ff;
+  color: #4f46e5;
 }
 
-.card-icon-wrapper.cyan {
-  background: rgba(6, 182, 212, 0.15);
-  color: #22d3ee;
+.icon-avatar.teal {
+  background: #f0fdfa;
+  color: #0d9488;
 }
 
-.card-icon {
-  width: 24px;
-  height: 24px;
+.avatar-icon {
+  width: 22px;
+  height: 22px;
 }
 
-.feature-card h3 {
-  font-size: 1.15rem;
+.service-card h3 {
+  font-size: 1.05rem;
   font-weight: 600;
-  margin: 0 0 0.5rem 0;
-  color: #f8fafc;
+  color: #0f172a;
+  margin: 0 0 0.4rem 0;
 }
 
-.feature-card p {
-  font-size: 0.9rem;
-  color: #94a3b8;
-  margin: 0;
+.service-card p {
+  font-size: 0.875rem;
+  color: #64748b;
   line-height: 1.5;
+  margin: 0;
 }
 
-/* 状态横幅 */
-.status-banner {
+/* 状态提示 */
+.connection-status {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.2);
-  border-radius: 12px;
-  padding: 1.25rem 1.5rem;
+  align-items: flex-start;
+  gap: 0.85rem;
+  background: #f0fdf4;
+  border: 1px solid #dcfce7;
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
 }
 
-.status-left {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.status-icon {
-  width: 28px;
-  height: 28px;
-  color: #4ade80;
+.status-badge-icon {
+  width: 22px;
+  height: 22px;
+  color: #16a34a;
   flex-shrink: 0;
+  margin-top: 2px;
 }
 
-.status-left strong {
-  display: block;
-  font-size: 0.95rem;
-  color: #86efac;
-  margin-bottom: 0.2rem;
+.status-text h4 {
+  font-size: 0.925rem;
+  font-weight: 600;
+  color: #15803d;
+  margin: 0 0 0.2rem 0;
 }
 
-.status-left p {
+.status-text p {
   font-size: 0.85rem;
-  color: #cbd5e1;
+  color: #475569;
   margin: 0;
 }
 </style>
