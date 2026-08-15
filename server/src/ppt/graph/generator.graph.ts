@@ -10,6 +10,8 @@ import {
 } from '../types/state';
 import { PptRenderService } from '../render/pptx.renderer';
 
+import { PRESENTATION_DESIGN_SKILL_PROMPT } from '../skills/presentation-design.skill';
+
 // ============================================================
 // LangGraph 状态 Annotation 定义
 // ============================================================
