@@ -67,6 +67,14 @@ const typeMap: Record<string, string> = {
   board: '板书设计',
   summary: '总结反思',
 };
+
+const layoutMap: Record<string, { label: string; color: string }> = {
+  timeline: { label: '时间轴流程', color: '#2563eb' },
+  compare: { label: '双栏强对比', color: '#dc2626' },
+  stat: { label: '焦点大字观点', color: '#7c3aed' },
+  matrix: { label: '四象限矩阵', color: '#059669' },
+  grid: { label: '多列网格', color: '#64748b' },
+};
 </script>
 
 <template>
@@ -78,7 +86,7 @@ const typeMap: Record<string, string> = {
           <h2>幻灯片与逐字稿预览</h2>
           <span class="count-badge">共 {{ store.slides.length }} 页</span>
         </div>
-        <p class="toolbar-sub">已完成排版算法计算与质量规则质检，每页均已注入专属演讲台词</p>
+        <p class="toolbar-sub">多版式视觉图示（时间轴、双栏对比、焦点大字、四象限矩阵）已就绪</p>
       </div>
 
       <div class="toolbar-actions">
@@ -111,6 +119,13 @@ const typeMap: Record<string, string> = {
           <div class="header-tag-row">
             <span class="page-badge">第 {{ slide.pageIndex }} 页</span>
             <span class="type-tag">{{ typeMap[slide.type] || slide.type }}</span>
+            <span
+              v-if="slide.layout && layoutMap[slide.layout]"
+              class="layout-tag"
+              :style="{ color: layoutMap[slide.layout].color, borderColor: layoutMap[slide.layout].color }"
+            >
+              {{ layoutMap[slide.layout].label }}
+            </span>
           </div>
           <h3 class="slide-title">{{ slide.title }}</h3>
           <span v-if="slide.subtitle" class="slide-subtitle">{{ slide.subtitle }}</span>
@@ -312,6 +327,15 @@ const typeMap: Record<string, string> = {
   font-size: 0.7rem;
   color: #64748b;
   background: #e2e8f0;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.layout-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #ffffff;
+  border: 1px solid currentColor;
   padding: 1px 6px;
   border-radius: 4px;
 }

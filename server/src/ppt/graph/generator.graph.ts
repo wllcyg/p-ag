@@ -164,10 +164,11 @@ export function buildGeneratorGraph(emit: SseEmitter) {
       ? `\n\n【⚠️ 上次生成格式校验未通过，请针对以下报错进行严格修正】：\n${previousErrors}`
       : '';
 
-    const systemPrompt = `你是一位专门负责将教案和说课思路转译为 PPT 结构化数据的专家。
+    const systemPrompt = `你是一位享誉业界的演示文稿设计大师（Presentation Design Master）与说课专家。
+你深谙演说视觉节奏与视觉隐喻（Visual Metaphors），坚决反对千篇一律的单调卡片堆砌！
 你必须只输出纯 JSON 对象，格式为 {"slides": [...]}，严禁包含任何 Markdown 格式说明或多余废话。`;
 
-    const userPrompt = `请基于以下完整的说课设计思路，将其转化为 8～10 张标准幻灯片（SlideItem）数据。
+    const userPrompt = `请基于以下完整的说课设计思路，运用【Presentation Design Skill】将其转化为 8～10 张极具视觉表现力的高级幻灯片（SlideItem）数据。
 
 【说课构思】：
 ${thoughts.slice(0, 3500)}
@@ -176,74 +177,90 @@ ${thoughts.slice(0, 3500)}
 学科：${dto.subject} | 年级：${dto.grade} | 课题：${dto.lessonTitle}
 ${repairHint}
 
-【严格的 JSON 结构规范】：
+【🎨 Presentation Design Skill 视觉版式分配法则】：
+每张幻灯片必须根据其核心语义指定最优的 layout 字段，形成丰富的版式节奏感：
+1. layout='timeline'（时间轴流式版式）：用于教学过程各环节、实验探索步骤，生成具有先后递进关系的步骤节点；
+2. layout='compare'（左右双栏强对比版式）：用于教学重点与难点突破、宏观现象 VS 微观本质、传统模式 VS 创新探究；
+3. layout='stat'（焦点观点/大字理念版式）：用于教学目标核心素养确立、教育理念提炼，左侧放置醒目主旨，右侧放置支撑条目；
+4. layout='matrix'（2x2 四象限矩阵版式）：用于学情多维洞察、教材四大知识板块网格；
+5. layout='grid'（经典精致卡片）：用于常规要点梳理；
+
+【严格的 JSON 结构规范示例】：
 {
   "slides": [
     {
       "pageIndex": 1,
       "type": "cover",
       "title": "${dto.lessonTitle}",
-      "subtitle": "${dto.subject} · ${dto.grade} · ${dto.textbookVersion || '通用版'}",
+      "subtitle": "${dto.subject} · ${dto.grade} · ${dto.textbookVersion || '通用统编版'}",
       "points": [],
-      "speakerNotes": "各位评委老师好，我说课的题目是..."
+      "speakerNotes": "各位评委老师好，今天我说课的题目是..."
     },
     {
       "pageIndex": 2,
       "type": "catalog",
       "title": "说课提纲",
-      "points": ["一、教材分析与地位", "二、学情特点与基础", "三、教学目标与重难点", "四、教法学法与策略", "五、教学过程与探究", "六、板书设计与反思"],
-      "speakerNotes": "本次说课我将从教材分析、学情分析、教学目标、教法学法、教学过程以及板书设计六个维度展开..."
+      "points": ["一、教材地位与核心价值", "二、多维学情画像洞察", "三、三维目标与重难点突破", "四、教法学法与创新策略", "五、教学过程与探究主线", "六、板书脉络与教学反思"],
+      "speakerNotes": "本次说课我将从六个核心维度依次展开汇报..."
     },
     {
       "pageIndex": 3,
       "type": "material",
-      "title": "教材分析与地位",
+      "layout": "matrix",
+      "title": "教材分析与知识脉络",
       "subtitle": "核心概念与承前启后价值",
-      "points": ["要点1（≤18字）", "要点2", "要点3", "要点4"],
-      "speakerNotes": "本节课在教材中具有重要的承上启下作用..."
+      "points": ["知识承接：衔接前期核心基础", "核心概念：建构学科关键模型", "思想方法：渗透科学探究思维", "育人价值：落实学科核心素养"],
+      "speakerNotes": "本节课在整个教材知识体系中起到关键枢纽作用..."
     },
     {
       "pageIndex": 4,
       "type": "student",
-      "title": "学情特点分析",
-      "points": ["已有认知储备", "思维发展特征", "潜在学习障碍"],
-      "speakerNotes": "针对该学段学生的认知特点..."
+      "layout": "stat",
+      "title": "学情洞察与素养起点",
+      "subtitle": "立足最近发展区\n驱动主动建构",
+      "points": ["已有认知：具备基础生活经验与概念感知", "思维特点：正由直观具象向逻辑抽象过渡", "潜在难点：对微观本质与定量规律理解不深"],
+      "speakerNotes": "针对该学段学生的思维发展阶段，教学中需搭建支架..."
     },
     {
       "pageIndex": 5,
       "type": "method",
-      "title": "教法学法选择",
-      "points": ["情境引导法", "实验探究法", "合作讨论法"],
-      "speakerNotes": "本节课我主要采用情境探究与任务驱动相结合的教法..."
+      "layout": "compare",
+      "title": "教学重难点与突破策略",
+      "points": ["重点一：掌握核心反应原理", "重点二：熟练规范实验操作", "难点一：微观反应机理推导", "难点二：实验异常现象分析"],
+      "speakerNotes": "在重难点的处理上，我将重点与难点进行分层协同突破..."
     },
     {
       "pageIndex": 6,
       "type": "process",
-      "title": "教学过程：情境导入",
-      "points": ["生活实例引入", "激发求知欲望", "明确本课目标"],
-      "speakerNotes": "在导入环节，我通过展示生活现象..."
+      "layout": "timeline",
+      "title": "教学过程：全景脉络",
+      "points": ["环节一：生活情境激趣导入", "环节二：实验探究建构新知", "环节三：合作研讨突破难点", "环节四：迁移应用巩固升华"],
+      "speakerNotes": "在教学过程设计上，我构建了环环相扣的四阶探究链条..."
     },
     {
       "pageIndex": 7,
       "type": "process",
-      "title": "教学过程：核心探究",
-      "points": ["提出核心问题", "自主合作探究", "归纳总结规律"],
-      "speakerNotes": "在核心探究阶段，引导学生开展小组实验与讨论..."
+      "layout": "grid",
+      "title": "核心探究环节深入展开",
+      "points": ["提出问题，引发认知冲突", "设计方案，开展对照实验", "记录数据，归纳科学规律", "反思评价，培养批判思维"],
+      "speakerNotes": "在核心探究阶段，引导学生自主设计实验并归纳规律..."
     },
     {
       "pageIndex": 8,
       "type": "board",
-      "title": "板书设计",
+      "title": "结构化板书设计",
       "subtitle": "${dto.lessonTitle}",
-      "points": ["核心概念", "探究主线", "反应/规律", "本质特征", "应用实践", "总结归纳"],
-      "speakerNotes": "我的板书设计以课题为核心向外辐射..."
+      "points": ["核心课题主旨", "基础现象与原理", "探究核心路径", "微观本质模型", "应用迁移拓展", "归纳总结反思"],
+      "speakerNotes": "我的板书设计采用结构化脉络图示，直观呈现本课知识主干..."
     },
     {
       "pageIndex": 9,
       "type": "summary",
+      "layout": "stat",
       "title": "教学反思与预期成效",
-      "points": ["达成知识目标", "培养探究能力", "落实核心素养"],
-      "speakerNotes": "通过本课的实施，预期能够有效达成教学目标..."
+      "subtitle": "以评促学\n实现知行合一",
+      "points": ["知识目标达成度预期超90%", "学生自主探究兴趣显著提升", "有效落实科学素养育人价值"],
+      "speakerNotes": "通过本节课的教学实施，预期能够实现高效达成与素养落地..."
     }
   ]
 }
@@ -251,9 +268,10 @@ ${repairHint}
 【硬性约束】：
 1. 必须生成 8 到 10 张页面，且每页 pageIndex 从 1 严格连续递增；
 2. type 只能是：'cover', 'catalog', 'material', 'student', 'method', 'process', 'board', 'summary'；
-3. points 中单条内容必须精炼（≤ 18 个汉字），除 cover 页外每页 2～6 条；
-4. speakerNotes 每页必须提供 60～220 字的完整口播演说稿；
-5. 只输出纯 JSON 字符串，不要带任何反引号代码块！`;
+3. layout 只能是：'timeline', 'compare', 'stat', 'matrix', 'grid'；
+4. points 中单条内容必须精炼（≤ 18 个汉字），除 cover 页外每页 2～6 条；
+5. speakerNotes 每页必须提供 60～220 字的完整口播演说稿；
+6. 只输出纯 JSON 字符串，不要带任何反引号代码块！`;
 
     const model = getModelName('structure');
 

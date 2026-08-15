@@ -23,9 +23,12 @@ export interface GeneratePptDto {
   theme?: ThemeType;
 }
 
+export type SlideLayout = 'timeline' | 'compare' | 'stat' | 'matrix' | 'grid';
+
 export interface SlideItem {
   pageIndex: number;
   type: SlideType;
+  layout?: SlideLayout;
   title: string;
   subtitle?: string;
   points: string[];

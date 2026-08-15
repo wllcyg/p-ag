@@ -24,28 +24,29 @@ export class GeneratePptDto {
   theme?: 'cat-purple' | 'tech-blue' | 'fresh-mint' | 'academic-red';
 }
 
+export type SlideLayout = 'timeline' | 'compare' | 'stat' | 'matrix' | 'grid';
+
 // ============================================================
 // 2. 单页数据模型
 // ============================================================
 export interface SlideItem {
   /** 页面索引（从 1 开始） */
   pageIndex: number;
-  /**
-   * 页面类型：
-   * - cover: 封面页（课题、学科、年级、教师信息）
-   * - catalog: 目录/说课提纲页
-   * - material: 教材分析页（教材地位、知识结构）
-   * - student: 学情分析页（认知基础、学习特点）
-   * - method: 教法学法页（教学理念、策略选择）
-   * - process: 教学过程页（核心环节展开，可有多页）
-   * - board: 板书设计页（知识框架可视化）
-   * - summary: 总结反思页（期望收益、评价方式）
-   */
+  /** 页面类型 */
   type: 'cover' | 'catalog' | 'material' | 'student' | 'method'
       | 'process' | 'board' | 'summary';
-  /** 页面标题（≤ 16 个汉字） */
+  /**
+   * 高级视觉排版版式（由 Presentation Design Skill 决策）：
+   * - timeline: 横向时间轴/步骤流（适合教学过程、实验步骤、发展脉络）
+   * - compare: 左右双栏强对比（适合重点 vs 难点、现象 vs 本质）
+   * - stat: 焦点大字/核心观点高亮（适合教学目标、课标素养要求）
+   * - matrix: 2x2 四象限矩阵（适合学情多维分析、教材知识网络）
+   * - grid: 经典多列卡片网格
+   */
+  layout?: SlideLayout;
+  /** 页面标题（≤ 24 个汉字） */
   title: string;
-  /** 副标题（可选，封面页/目录页常用） */
+  /** 副标题 */
   subtitle?: string;
   /**
    * 内容条目列表（单条 ≤ 15 个字符，建议 3～5 条）
@@ -72,6 +73,7 @@ export const SlideItemSchema = z.object({
   pageIndex: z.number().int().min(1),
   type: z.enum(['cover', 'catalog', 'material', 'student', 'method',
                  'process', 'board', 'summary']),
+  layout: z.enum(['timeline', 'compare', 'stat', 'matrix', 'grid']).optional(),
   title: z.string().min(1).max(40),
   subtitle: z.string().max(60).optional(),
   points: z
