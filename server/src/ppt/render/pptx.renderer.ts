@@ -80,13 +80,18 @@ function resolveFontFace(): string {
 }
 
 // ============================================================
-// 分页策略：每种版式单页可容纳的最大要点数
+// 分页策略：每种版式单页可容纳的最大要点数（严格穷尽式类型定义）
 // 超出的部分不再截断丢弃，而是在渲染前拆成"续页"
 // ============================================================
-const MAX_PER_PAGE: Record<string, number> = {
+const MAX_PER_PAGE: Record<SlideItem['type'], number> = {
+  cover: 0,     // 封面：永不分页
   catalog: 7,   // 目录：固定 0.75" 行高，超过 7 条会挤出页面
   board: 8,     // 板书：辐射节点超过 8 个视觉上会互相压盖，拆成第二张辐射图
-  content: 8,   // 正文卡片：4x2 网格上限，超过拆成"续"页
+  material: 8,  // 教材分析：4x2 卡片上限，超过拆成续页
+  student: 8,   // 学情分析：4x2 卡片上限
+  method: 8,    // 教法学法：4x2 卡片上限
+  process: 8,   // 教学过程：4x2 卡片上限
+  summary: 8,   // 总结反思：4x2 卡片上限
 };
 
 /**
@@ -98,7 +103,7 @@ const MAX_PER_PAGE: Record<string, number> = {
 function paginateSlide(item: SlideItem): SlideItem[] {
   if (item.type === 'cover') return [item];
 
-  const max = MAX_PER_PAGE[item.type] ?? MAX_PER_PAGE.content;
+  const max = MAX_PER_PAGE[item.type];
   const points = item.points ?? [];
   if (points.length <= max) return [item];
 
